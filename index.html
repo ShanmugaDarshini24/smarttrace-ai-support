@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartTrace AI — SaaS Support Triage & Log Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold">
+          ST
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white">SmartTrace AI</h1>
+          <p class="text-xs text-slate-400">Supply Chain SaaS Support Triage & Log Analyzer</p>
+        </div>
+      </div>
+
+      <!-- Optional Gemini API Key Input -->
+      <div class="flex items-center gap-2">
+        <input
+          id="apiKeyInput"
+          type="password"
+          placeholder="Optional: Paste Gemini API Key"
+          class="bg-slate-800 border border-slate-700 text-xs text-slate-200 rounded-lg px-3 py-2 w-56 focus:outline-none focus:border-emerald-500"
+        />
+        <span id="modeBadge" class="text-xs px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+          Demo + Live AI Ready
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Left Column: Ticket & Log Input -->
+    <section class="lg:col-span-5 space-y-5">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-emerald-400 mb-3">
+          1. Load Sample FourKites Incident
+        </h2>
+        <div class="grid grid-cols-1 gap-2">
+          <button onclick="loadSample('edi400')" class="text-left p-3 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition">
+            <div class="text-xs font-semibold text-white">Scenario A: EDI 214 / API 400 Bad Request</div>
+            <div class="text-[11px] text-slate-400">Retailer shipment missing mandatory tracking ID in payload</div>
+          </button>
+          <button onclick="loadSample('auth401')" class="text-left p-3 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition">
+            <div class="text-xs font-semibold text-white">Scenario B: Carrier GPS Webhook 401 Error</div>
+            <div class="text-[11px] text-slate-400">Expired carrier bearer token blocking live ELD location pings</div>
+          </button>
+          <button onclick="loadSample('staleGps')" class="text-left p-3 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition">
+            <div class="text-xs font-semibold text-white">Scenario C: Cold-Chain Shipment Stale ETA</div>
+            <div class="text-[11px] text-slate-400">Medical load showing 5-hour GPS gap & false delay alert</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-emerald-400">
+          2. Customer Ticket & Raw Error Log
+        </h2>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Customer Complaint / Email</label>
+          <textarea
+            id="customerTicket"
+            rows="3"
+            placeholder="Paste customer message here..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+          ></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">API / JSON / EDI Error Log</label>
+          <textarea
+            id="errorLog"
+            rows="6"
+            placeholder='{"status": 400, "error": "Missing shipment_id"...}'
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-emerald-300 focus:outline-none focus:border-emerald-500"
+          ></textarea>
+        </div>
+
+        <button
+          id="analyzeBtn"
+          onclick="analyzeIncident()"
+          class="w-full py-3 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm transition flex items-center justify-center gap-2"
+        >
+          <span>Analyze Incident & Generate Triage</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Right Column: AI Triage Output -->
+    <section class="lg:col-span-7 space-y-5">
+      <div id="emptyState" class="bg-slate-900/50 border border-dashed border-slate-800 rounded-xl p-12 text-center">
+        <p class="text-slate-400 text-sm">Select a sample supply-chain incident on the left or paste a raw JSON log, then click <strong class="text-white">Analyze Incident</strong>.</p>
+      </div>
+
+      <div id="resultPanel" class="hidden space-y-5">
+        <!-- Severity & Root Cause Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <span id="severityBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              P1 — High Priority
+            </span>
+            <span id="categoryBadge" class="px-3 py-1 rounded-full text-xs bg-sky-500/20 text-sky-300 border border-sky-500/30">
+              API / Integration
+            </span>
+          </div>
+
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Root-Cause Diagnosis</h3>
+          <p id="rootCauseText" class="text-sm text-slate-100 leading-relaxed mb-4"></p>
+
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Recommended Support Action</h3>
+          <p id="actionText" class="text-sm text-emerald-300 leading-relaxed"></p>
+        </div>
+
+        <!-- Customer Update Email -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+              Customer Update Email (Jargon-Free)
+            </h3>
+            <button onclick="copyText('customerEmail')" class="text-xs text-slate-400 hover:text-white underline">Copy</button>
+          </div>
+          <pre id="customerEmail" class="whitespace-pre-wrap font-sans text-sm text-slate-200 bg-slate-950 p-4 rounded-lg border border-slate-800"></pre>
+        </div>
+
+        <!-- Engineering / QA Jira Escalation -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400">
+              Engineering / QA Escalation Ticket (Jira Format)
+            </h3>
+            <button onclick="copyText('jiraTicket')" class="text-xs text-slate-400 hover:text-white underline">Copy</button>
+          </div>
+          <pre id="jiraTicket" class="whitespace-pre-wrap font-mono text-xs text-slate-300 bg-slate-950 p-4 rounded-lg border border-slate-800"></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const SAMPLES = {
+      edi400: {
+        ticket: "Hi Support, our urgent grocery load #FK-90842 from Dallas to Chicago is not showing up on our visibility dashboard. Carrier says they transmitted the status update 30 mins ago. Please check urgently!",
+        log: `{\n  "timestamp": "2026-11-17T16:42:10Z",\n  "endpoint": "POST /api/v2/shipments/tracking-events",\n  "carrier_scac": "KNIG",\n  "http_status": 400,\n  "error_code": "VALIDATION_ERROR",\n  "message": "Field 'shipment_reference_id' cannot be null or empty",\n  "payload_snippet": { "load_id": "FK-90842", "shipment_reference_id": null, "status": "IN_TRANSIT" }\n}`,
+        fallback: {
+          severity: "P2 — Urgent Shipment Visibility",
+          category: "Integration / Payload Validation (HTTP 400)",
+          rootCause: "Carrier (SCAC: KNIG) pushed a tracking event to POST /api/v2/shipments/tracking-events, but the API rejected it with HTTP 400 Bad Request because 'shipment_reference_id' was sent as null.",
+          action: "Configuration/Data Issue (No Engineering bug). Contact Carrier KNIG's EDI/IT team with the rejected payload sample and request them to map 'FK-90842' into 'shipment_reference_id' and re-trigger the event.",
+          email: "Subject: Update on Shipment #FK-90842 Visibility\n\nHi Team,\n\nThank you for flagging shipment #FK-90842. We investigated the tracking feed from the carrier (KNIG) and identified why the status update did not appear on your dashboard.\n\nThe carrier's automated tracking message was rejected by our gateway because a required shipment reference field was left blank in their transmission. We have already reached out to the carrier's technical team with the exact details so they can resend the update properly.\n\nWe are actively monitoring this load and will confirm as soon as live tracking appears on your board.\n\nBest regards,\nProduct Support Team",
+          jira: "Summary: [Carrier Onboarding/Config] SCAC KNIG sending null shipment_reference_id on Load FK-90842\nEnvironment: Production Tracking Gateway\nSteps to Reproduce:\n1. Inspect incoming POST /api/v2/shipments/tracking-events logs for SCAC 'KNIG' at 16:42 UTC.\n2. Observe HTTP 400 VALIDATION_ERROR due to null 'shipment_reference_id'.\nExpected Result: Payload populates 'shipment_reference_id' and updates load status.\nActual Result: API rejects payload with 400 status; dashboard remains un-updated.\nNext Step: Carrier Integration team to share payload spec with KNIG."
+        }
+      },
+      auth401: {
+        ticket: "All 18 of our active flatbed shipments assigned to Apex Freight stopped updating GPS locations since 2:00 PM EST today. Is FourKites experiencing an outage?",
+        log: `{\n  "timestamp": "2026-11-17T19:05:00Z",\n  "endpoint": "POST /api/v2/eld/gps-pings",\n  "carrier_scac": "APXF",\n  "http_status": 401,\n  "error_code": "TOKEN_EXPIRED",\n  "message": "Bearer token expired at 2026-11-17T19:00:00Z. Affected active loads: 18"\n}`,
+        fallback: {
+          severity: "P1 — Multi-Load Carrier Feed Down",
+          category: "Authentication / ELD Integration (HTTP 401)",
+          rootCause: "FourKites platform is healthy. Apex Freight's (SCAC: APXF) ELD API bearer token expired at 19:00 UTC, causing all 18 active GPS ping requests to fail with HTTP 401 Unauthorized.",
+          action: "Generate/refresh the API credentials for Apex Freight in the Carrier Portal and instruct the carrier's telematics admin to update their bearer token.",
+          email: "Subject: Resolved Cause: GPS Tracking Pause for Apex Freight Loads (18 Shipments)\n\nHi Team,\n\nWe checked our platform health and confirmed there is no system-wide outage. However, we found why your 18 Apex Freight shipments paused updating at 2:00 PM EST.\n\nApex Freight's GPS connection credentials expired automatically at 2:00 PM EST, blocking new location pings from reaching your dashboard. We are working directly with Apex Freight's telematics administrator to refresh their security token and restore live GPS tracking.\n\nI will send you a confirmation within the next 30 minutes once pings resume.\n\nBest regards,\nProduct Support Team",
+          jira: "Summary: [Carrier Auth] SCAC APXF ELD GPS feed failing with HTTP 401 TOKEN_EXPIRED (18 loads)\nImpact: 18 active shipments missing live GPS pings since 19:00 UTC.\nRoot Cause: Bearer token expired at 2026-11-17T19:00:00Z.\nAction Taken: Issued token refresh instructions to APXF telematics contact; monitoring ping ingestion."
+        }
+      },
+      staleGps: {
+        ticket: "URGENT: Temperature-sensitive medical shipment #MED-4410 is showing 'Delayed by 4 Hours' in red, but our driver just called and said he is 20 minutes from the hospital warehouse!",
+        log: `{\n  "load_id": "MED-4410",\n  "cargo_type": "PHARMA_COLD_CHAIN",\n  "last_gps_ping": "2026-11-17T12:10:00Z",\n  "current_time": "2026-11-17T17:15:00Z",\n  "ping_gap_minutes": 305,\n  "eld_provider": "Samsara",\n  "warning": "No telemetry received for > 180 mins; Dynamic ETA defaulted to fallback historical speed"\n}`,
+        fallback: {
+          severity: "P1 — Critical Medical Cold-Chain Alert",
+          category: "Telemetry Gap / Dynamic ETA Recalculation",
+          rootCause: "The truck's Samsara ELD stopped transmitting GPS telemetry for 305 minutes (likely cellular dead zone or ELD app background sleep). Because no fresh pings arrived, FourKites' Dynamic ETA engine flagged a false 4-hour delay.",
+          action: "Trigger a manual telemetry poll on Samsara integration, log a manual check-call milestone (20 mins from destination) so the hospital receiving dock is alerted, and verify ELD polling health.",
+          email: "Subject: URGENT Update: Medical Shipment #MED-4410 On Schedule (20 Mins Out)\n\nHi Team,\n\nWe prioritized shipment #MED-4410 immediately. We confirmed the red delay alert was triggered because the truck's GPS device experienced a temporary cellular signal gap—not an actual transit delay.\n\nWe have refreshed the telemetry connection and updated the shipment's live arrival milestone so your receiving dock team knows the driver is ~20 minutes away.\n\nPlease let us know if you need anything else before unloading.\n\nBest regards,\nProduct Support Team",
+          jira: "Summary: [Telemetry / ETA] Stale Samsara GPS gap (305 mins) caused false delay alert on Cold-Chain Load MED-4410\nSteps to Reproduce:\n1. Query telemetry logs for load MED-4410 between 12:10 UTC and 17:15 UTC.\n2. Observe 305-minute ping gap triggering fallback ETA delay flag.\nAction Taken: Forced manual telemetry sync and updated milestone ETA."
+        }
+      }
+    };
+
+    function loadSample(key) {
+      document.getElementById('customerTicket').value = SAMPLES[key].ticket;
+      document.getElementById('errorLog').value = SAMPLES[key].log;
+      window.currentFallback = SAMPLES[key].fallback;
+    }
+
+    async function analyzeIncident() {
+      const ticket = document.getElementById('customerTicket').value.trim();
+      const log = document.getElementById('errorLog').value.trim();
+      const apiKey = document.getElementById('apiKeyInput').value.trim();
+      const btn = document.getElementById('analyzeBtn');
+
+      if (!ticket && !log) {
+        alert("Please select a sample scenario or enter a ticket/error log first.");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Analyzing Incident...";
+
+      try {
+        if (apiKey) {
+          const prompt = `You are a Senior SaaS Product Support Specialist at FourKites (a real-time supply chain visibility platform). Analyze this customer ticket and technical log. Return ONLY valid JSON with keys: severity, category, rootCause, action, email, jira.\n\nCustomer Ticket: ${ticket}\nError Log: ${log}`;
+
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          });
+
+          const data = await res.json();
+          const parsed = JSON.parse(data.candidates[0].content.parts[0].text);
+          renderResult(parsed);
+        } else {
+          // Instant deterministic fallback if no API key is entered
+          await new Promise(r => setTimeout(r, 500));
+          const result = window.currentFallback || {
+            severity: "P2 — Technical Investigation Required",
+            category: "Application / API Diagnostics",
+            rootCause: "Analyzed log payload and customer report: detected an integration/data discrepancy requiring payload validation and timestamp verification.",
+            action: "Verify request headers/authentication tokens, replicate the API call in staging, and confirm whether the anomaly is carrier-side data or a platform bug.",
+            email: "Hi Team,\n\nThank you for reaching out with these details. Our Product Support team is actively investigating the issue based on the error logs captured. We will share a concrete root-cause update with you shortly.\n\nBest regards,\nProduct Support Team",
+            jira: `Summary: Customer Reported Issue — ${ticket.slice(0, 60)}\nLogs Analyzed:\n${log}\nNext Step: Replicate in staging and verify API response codes.`
+          };
+          renderResult(result);
+        }
+      } catch (err) {
+        alert("API Error: Check your Gemini API key or clear the key field to use built-in demo mode.");
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Analyze Incident & Generate Triage";
+      }
+    }
+
+    function renderResult(data) {
+      document.getElementById('emptyState').classList.add('hidden');
+      document.getElementById('resultPanel').classList.remove('hidden');
+      document.getElementById('severityBadge').innerText = data.severity;
+      document.getElementById('categoryBadge').innerText = data.category;
+      document.getElementById('rootCauseText').innerText = data.rootCause;
+      document.getElementById('actionText').innerText = data.action;
+      document.getElementById('customerEmail').innerText = data.email;
+      document.getElementById('jiraTicket').innerText = data.jira;
+    }
+
+    function copyText(elementId) {
+      const text = document.getElementById(elementId).innerText;
+      navigator.clipboard.writeText(text);
+      alert("Copied to clipboard!");
+    }
+
+    // Pre-load Scenario A on startup
+    loadSample('edi400');
+  </script>
+</body>
+</html>
